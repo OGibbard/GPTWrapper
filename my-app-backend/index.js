@@ -2,8 +2,10 @@
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
+const { OpenAI } = require('openai');
+require('dotenv').config();
 
-// --- IMPORTANT: Initialize Firebase Admin SDK ---
+// --- Initialize Firebase Admin SDK ---
 const serviceAccount = require('./service-account-key.json');
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
@@ -11,7 +13,13 @@ admin.initializeApp({
 
 const app = express();
 app.use(cors()); // Enable CORS for all routes
+app.use(express.json());
 const port = 5000;
+
+// --- Initialize OpenAI ---
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 // --- Middleware to verify Firebase ID token ---
 const verifyAuthToken = async (req, res, next) => {
@@ -31,7 +39,6 @@ const verifyAuthToken = async (req, res, next) => {
     }
 };
 
-
 // --- API Routes ---
 app.get('/api/public-data', (req, res) => {
     res.json({ message: 'This is public data, anyone can see it.' });
@@ -46,6 +53,41 @@ app.get('/api/secret-data', verifyAuthToken, (req, res) => {
     });
 });
 
+// --- NEW CHAT API ENDPOINT ---
+app.post('/api/chat', verifyAuthToken, async (req, res) => {
+  const { message, history } = req.body;
+  const userId = req.user.uid;
+
+  if (!message) {
+    return res.status(400).send('Message is required.');
+  }
+
+  try {
+    const messagesForAPI = [
+      { role: 'system', content: 'You are a helpful assistant.' },
+      ...(Array.isArray(history) ? history : []),
+      { role: 'user', content: message }
+    ];
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: messagesForAPI,
+    });
+
+    const aiResponse = completion.choices[0].message.content;
+
+    // (Optional) Save conversation to Firestore
+    // const userChatHistoryRef = admin.firestore().collection('users').doc(userId).collection('chats');
+    // await userChatHistoryRef.add({ role: 'user', content: message, timestamp: new Date() });
+    // await userChatHistoryRef.add({ role: 'assistant', content: aiResponse, timestamp: new Date() });
+
+    res.json({ response: aiResponse });
+
+  } catch (error) {
+    console.error("Error calling OpenAI API:", error);
+    res.status(500).send('Failed to get response from AI.');
+  }
+});
 
 app.listen(port, () => {
     console.log(`Node.js server listening at http://localhost:${port}`);

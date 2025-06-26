@@ -10,8 +10,6 @@ const APP_VERSION = '1.0.0'; // <-- update this string as needed
 
 function App() {
   const [user, setUser] = useState(null);
-  const [publicData, setPublicData] = useState('');
-  const [secretData, setSecretData] = useState('');
 
   useEffect(() => {
     // Listen for authentication state changes
@@ -40,7 +38,6 @@ function App() {
 
   return (
     <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-      <h1>React, Node & Firebase</h1>
       <div style={{ color: 'gray', fontSize: '0.9em' }}>
         Version: {APP_VERSION}
       </div>
